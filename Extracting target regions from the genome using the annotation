@@ -1,0 +1,12 @@
+## This command collects all the information from the desired target sequences (e.g effectors), having as input the annotation and generating a file only with the IDs  
+
+grep 'effector' psc_merged_contigs_2017.gff3 | cut -f 9 | sed $'s/;/\t/g' | cut -f1 | sed $'s/-mRNA/\t/g' | cut -f 1 | sed 's/ID=//g' | sort -u -o all_affectors_pcs2017.txt
+
+## This command create the .bed file that contains all the information from the desired target sequences (e.g effectors)
+## The  resulting file has 6 columns, Seqname (contig), Start site, End site, name, score and strand.
+
+grep -f all_affectors_pcs2017.txt psc_merged_contigs_2017.gff3 | awk -v OFS='\t' '{if($3=="gene") print $0}' | awk -v OFS='\t' '{print $1,$4,$5,".",$7,$9}' | sed $'s/;/\t/g' | cut -f1-6 | sed 's/ID=//g' | awk -v OFS='\t' '{print $1,$2,$3,$6,$4,$5}' > all_effectors_pcs2017.bed
+
+## This command create the a fasta file with all the sequences of the desired target sequences (e.g effectors)
+
+bedtools getfasta -fi psc_merged_contigs.fasta -bed all_affectors_pcs2017.bed -s -name -fo all_affectors_pcs2017.fa
