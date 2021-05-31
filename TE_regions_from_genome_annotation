@@ -1,3 +1,4 @@
+## These code lines were used to extract all the target DNA regions from the genome using the information of the annotation
 ## This command collects all the information from the desired target sequences (e.g effectors), having as input the annotation and generating a file only with the IDs  
 
 grep 'effector' psc_merged_contigs_2017.gff3 | cut -f 9 | sed $'s/;/\t/g' | cut -f1 | sed $'s/-mRNA/\t/g' | cut -f 1 | sed 's/ID=//g' | sort -u -o all_affectors_pcs2017.txt
