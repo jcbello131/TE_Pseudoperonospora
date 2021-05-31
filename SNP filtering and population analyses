@@ -1,0 +1,159 @@
+
+### getting the vcf file into R.. cleaning the data from missing varinats and poorly genotyope samples
+
+library("poppr")
+library("vcfR")
+library("ape")
+library("pegas")
+library("ggplot2")
+library("adegenet")
+library("seqinr")
+
+Unix_VCF<-read.vcfR("~/Desktop/populations_169_EG_70.vcf", limit = 1e+07, nrows = -1, skip = 0, cols = NULL,
+                    convertNA = TRUE, verbose = TRUE)
+
+#recoding the missing information so poppr can recongnize de missing information
+vcf<-Unix_VCF
+vcf
+dp <- extract.gt(vcf, element = "DP", as.numeric=TRUE)
+quants <- apply(dp, MARGIN=2, quantile, probs=c(0.1, 0.8), na.rm=TRUE)
+quants[,1:6]
+dp2 <- sweep(dp, MARGIN=2, FUN = "-", quants[1,])
+dp[dp2 < 0] <- NA
+dp2 <- sweep(dp, MARGIN=2, FUN = "-", quants[2,])
+dp[dp2 > 0] <- NA
+dp[dp < 4] <- NA
+vcf@gt[,-1][ is.na(dp) == TRUE ] <- NA
+
+#omitting data 
+dp <- extract.gt(vcf, element = "DP", as.numeric=TRUE)
+#heatmap.bp(dp, rlabels = FALSE)
+
+#omitting data samples
+myMiss <- apply(dp, MARGIN = 2, function(x){ sum( is.na(x) ) } )
+myMiss <- myMiss / nrow(dp)
+barplot(myMiss, las = 3)
+##remove samples who missing information is above 40 %
+vcf@gt <- vcf@gt[, c(TRUE, myMiss < 0.4)]
+dp <- extract.gt(vcf, element = "DP", as.numeric=TRUE)
+myMiss <- apply(dp, MARGIN = 2, function(x){ sum( is.na(x) ) } )
+myMiss <- myMiss / nrow(dp)
+barplot(myMiss, las = 3)
+vcf
+dp <- extract.gt(vcf, element = "DP", as.numeric=TRUE)
+#heatmap.bp(dp, rlabels = FALSE)
+
+
+#omitting data variants 
+myMiss <- apply(dp, MARGIN = 1, function(x){ sum( is.na(x) ) } )
+myMiss <- myMiss / ncol(dp)
+vcf <- vcf[myMiss < 0.2 ]
+#vcf <- vcf[myMiss < 0.08]
+vcf
+dp <- extract.gt(vcf, element = "DP", as.numeric=TRUE)
+#heatmap.bp(dp, rlabels = FALSE)
+dp <- extract.gt(vcf, element = "DP", as.numeric=TRUE)
+myMiss <- apply(dp, MARGIN = 2, function(x){ sum( is.na(x) ) } )
+myMiss <- myMiss / nrow(dp)
+barplot(myMiss, las = 3)
+vcf
+
+### treating your illumina sequencing data as regular pop gen data
+y<-vcfR2genind(vcf, sep = "[|/]")
+yz<-as.genclone(y)
+s<-read.table("~/Desktop/Strata_128B.txt", sep = "\t", stringsAsFactors = F, header = F)
+strata(yz)<-s
+splitStrata(yz) <- ~State/County/Year/Host/Year2/region/clade
+#gac <- genotype_curve(z, sample = 100, quiet = TRUE)
+setPop(yz) <- ~clade
+ploidy(yz)<-2
+r<-genclone2genind(yz)
+library("adegenet")
+library("hierfstat")
+pop(r)
+
+poppr(r)
+
+
+###population differentiation by year on P. cubensis clade ii
+setPop(yz) <- ~Host
+Pram_sub <- popsub(yz, blacklist = c("H.lupulus"))
+gl.rubi3<-Pram_sub
+pop(gl.rubi3)
+Pram_sub <- popsub(gl.rubi3, blacklist = c("Sq", "Pm", "Wm"))
+gl.rubi4<-Pram_sub
+pop(gl.rubi4)
+setPop(gl.rubi4) <- ~region
+
+poppr(gl.rubi4)
+
+Pram_sub <- popsub(gl.rubi4, blacklist = c("2016", "2012", "2017","2009","2015", "2018"))
+gl.rubi4<-Pram_sub
+pop(yz)
+
+r<-genclone2genind(yz)
+pop(r)
+Mydata2 <- genind2hierfstat(r) 
+a<-basic.stats(r) 
+wc(r)
+genet.dist(r, method = "WC84")
+amova.cc.result <- poppr.amova(r, ~Host/Year, clonecorrect = TRUE, cutoff = 0.1, within = FALSE)
+amova.cc.result
+Hyp.drain.amova.test = randtest(amova.cc.result)
+Hyp.drain.amova.test
+
+###population differentiation year by year on P. cubensis clade ii
+setPop(yz) <- ~Host
+Pram_sub <- popsub(yz, blacklist = c("H.lupulus"))
+gl.rubi3<-Pram_sub
+pop(gl.rubi3)
+Pram_sub <- popsub(gl.rubi3, blacklist = c("Sq", "Pm", "Me", "Wm"))
+gl.rubi4<-Pram_sub
+pop(gl.rubi4)
+setPop(gl.rubi4) <- ~Year
+Pram_sub <- popsub(gl.rubi4, blacklist = c("2016", "2012"))
+gl.rubi4<-Pram_sub
+pop(gl.rubi4)
+setPop(gl.rubi4) <- ~Year
+pop(gl.rubi4)
+###excluir en este backlist los grupos a comparar
+Pram_sub <- popsub(gl.rubi4, blacklist = c("2017", "2015", "2009", "2018"))
+gl.rubi4<-Pram_sub
+setPop(gl.rubi4) <- ~Year
+pop(gl.rubi4)
+r<-genclone2genind(gl.rubi4)
+Mydata2 <- genind2hierfstat(r) 
+basic.stats(r) 
+#wc(r)
+#genet.dist(r, method = "WC84")
+set.seed(999)
+amova.cc.result <- poppr.amova(r, ~Year, clonecorrect = TRUE, cutoff = 0.1)
+amova.cc.result
+Hyp.drain.amova.test = randtest(amova.cc.result)
+Hyp.drain.amova.test
+
+###population differentiation by clade
+setPop(yz) <- ~Host
+Pram_sub <- popsub(yz, blacklist = c("C.sativus"))
+gl.rubi3<-Pram_sub
+pop(gl.rubi3)
+Pram_sub <- popsub(gl.rubi3, blacklist = c("Sq", "Pm", "Me", "Wm"))
+gl.rubi4<-Pram_sub
+pop(gl.rubi4)
+setPop(gl.rubi4) <- ~Year
+pop(gl.rubi4)
+setPop(gl.rubi4) <- ~Year
+Pram_sub <- popsub(gl.rubi4, blacklist = c("2012", "2019"))
+gl.rubi4<-Pram_sub
+pop(gl.rubi4)
+
+r<-genclone2genind(gl.rubi4)
+Mydata2 <- genind2hierfstat(r) 
+basic.stats(r) 
+#wc(r)
+#genet.dist(r, method = "WC84")
+set.seed(999)
+amova.cc.result <- poppr.amova(r, ~Year, clonecorrect = TRUE, cutoff = 0.1)
+amova.cc.result
+Hyp.drain.amova.test = randtest(amova.cc.result)
+Hyp.drain.amova.test
